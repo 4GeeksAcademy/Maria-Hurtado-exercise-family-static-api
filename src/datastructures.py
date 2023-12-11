@@ -1,36 +1,73 @@
-
 """
-update this file to implement the following already declared methods:
-- add_member: Should add a member to the self._members list
-- delete_member: Should delete a member from the self._members list
-- update_member: Should update a member from the self._members list
-- get_member: Should return a member from the self._members list
+This module takes care of starting the API Server, Loading the DB and Adding the endpoints
 """
-from random import randint
+import os
+from flask import Flask, request, jsonify, url_for
+from flask_cors import CORS
+from utils import APIException, generate_sitemap
+from datastructures import FamilyStructure
+#from models import Person
 
-class FamilyStructure:
-    def __init__(self, last_name):
-        self.last_name = last_name
+app = Flask(__name__)
+app.url_map.strict_slashes = False
+CORS(app)
 
-        # example list of members
-        self._members = []
+# create the jackson family object
+jackson_family = FamilyStructure("Jackson")
 
-    # read-only: Use this method to generate random members ID's when adding members into the list
-    def _generateId(self):
-        return randint(0, 99999999)
+# Handle/serialize errors like a JSON object
+@app.errorhandler(APIException)
+def handle_invalid_usage(error):
+    return jsonify(error.to_dict()), error.status_code
 
-    def add_member(self, member):
-        # fill this method and update the return
-        pass
+# generate sitemap with all your endpoints
+@app.route('/')
+def sitemap():
+    return generate_sitemap(app)
 
-    def delete_member(self, id):
-        # fill this method and update the return
-        pass
+@app.route('/members', methods=['GET'])
+def handle_hello():
 
-    def get_member(self, id):
-        # fill this method and update the return
-        pass
+    # this is how you can use the Family datastructure by calling its methods
+    members = jackson_family.get_all_members()
+    response_body = {
+        "hello": "world",
+        "family": members
+    }
 
-    # this method is done, it returns a list with all the family members
-    def get_all_members(self):
-        return self._members
+    return jsonify(response_body), 200
+
+@app.route('/members', methods=['GET'])
+def get_member_list():
+
+    members = jackson_family.get_all_members()
+    return jsonify(members), 200
+
+
+@app.route('/member/<int:member_id>', methods=['GET'])
+def get_member(member_id):
+
+    member = jackson_family.get_member(member_id)
+    if member:
+        return jsonify(member), 200
+    else:
+        return jsonify({'msg': 'Member not found with this ID'}), 404
+
+@app.route('/member', methods=['POST'])
+def add_member():
+
+    member = request.json
+    jackson_family.add_member(member)
+    return jsonify({}), 200
+
+@app.route('/member/<int:member_id>', methods=['DELETE'])
+def delete_member(member_id):
+
+    member = jackson_family.delete_member(member_id)
+    return jsonify({ "done": True }), 200
+
+
+# this only runs if `$ python src/app.py` is executed
+if __name__ == '__main__':
+    PORT = int(os.environ.get('PORT', 3000))
+    app.run(host='0.0.0.0', port=PORT, debug=True)
